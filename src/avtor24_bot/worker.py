@@ -5,15 +5,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from .browser_bid import BrowserBidError, BrowserBidExecutor, CaptchaRequiredError
 from .config import AccountConfig
-from .graphql import (
-    add_comment,
-    fetch_orders,
-    get_bid_params,
-    get_order_for_bid,
-    make_offer,
-    mark_order_as_read,
-)
+from .graphql import add_comment, fetch_orders, get_bid_params, get_order_for_bid, mark_order_as_read
 from .http import GraphQLClient
 from .models import Order
 from .queue import OrderQueue
@@ -37,6 +31,13 @@ class AccountWorker:
         self._queue = OrderQueue()
         self._last_bid_at: Optional[datetime] = None
         self._stop_event = asyncio.Event()
+        auth = self._config.data.auth
+        self._browser_executor = BrowserBidExecutor(
+            base_url=self._config.data.base_url,
+            cookie_header=auth.cookie,
+            user_agent=auth.user_agent,
+            browser_config=self._config.data.browser,
+        )
 
     @property
     def login(self) -> str:
@@ -45,20 +46,21 @@ class AccountWorker:
     async def run(self) -> None:
         account_state = self._state_repo.get(self.login)
         auth = self._config.data.auth
-        async with GraphQLClient(
-            base_url=self._config.data.base_url,
-            cookie=auth.cookie,
-            user_agent=auth.user_agent,
-        ) as client:
-            poll_interval = self._config.data.poll_interval_seconds
-            min_between_bids = self._config.data.min_seconds_between_bids
-            while not self._stop_event.is_set():
-                try:
-                    await self._refresh_queue(client)
-                    await self._process_next_order(client, account_state, min_between_bids)
-                except Exception:  # pragma: no cover - logging path
-                    logger.exception("Worker %s iteration failed", self.login)
-                await asyncio.sleep(poll_interval)
+        async with self._browser_executor:
+            async with GraphQLClient(
+                base_url=self._config.data.base_url,
+                cookie=auth.cookie,
+                user_agent=auth.user_agent,
+            ) as client:
+                poll_interval = self._config.data.poll_interval_seconds
+                min_between_bids = self._config.data.min_seconds_between_bids
+                while not self._stop_event.is_set():
+                    try:
+                        await self._refresh_queue(client)
+                        await self._process_next_order(client, account_state, min_between_bids)
+                    except Exception:  # pragma: no cover - logging path
+                        logger.exception("Worker %s iteration failed", self.login)
+                    await asyncio.sleep(poll_interval)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -123,18 +125,17 @@ class AccountWorker:
                 is_first_offer=order.count_offers == 0,
             )
         bid = self._calculate_bid(order, order_details, bid_params)
-        captcha_token = None
-        response = await make_offer(
-            client,
-            order_id=order.id,
-            bid=bid,
-            message=self._render_initial_message(order),
-            captcha_token=captcha_token,
-            scenario=None,
-            expired=None,
-        )
-        if not response:
-            logger.warning("Order %s: empty response on make_offer", order.id)
+        try:
+            await self._browser_executor.place_bid(
+                order,
+                bid,
+                self._render_initial_message(order),
+            )
+        except CaptchaRequiredError as exc:
+            logger.warning("Order %s: captcha required (%s)", order.id, exc)
+            return
+        except BrowserBidError as exc:
+            logger.error("Order %s: browser bid failed: %s", order.id, exc)
             return
         account_state.mark_bid_sent(order.id)
         task_id = self._scheduler.schedule(

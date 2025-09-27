@@ -23,5 +23,10 @@
   "auth": {
     "cookie": "_ym_uid=...; PHPSESSID=...",
     "user_agent": "Mozilla/5.0"
+  },
+  "browser": {
+    "headless": true,
+    "slow_mo": 0,
+    "navigation_timeout_ms": 15000
   }
 }

@@ -12,6 +12,7 @@
 - `filters.subject_ids` и `filters.type_ids`: список допустимых предметов и типов.
 - `messages.initial` и `messages.followup`: шаблоны сообщений.
 - `bid.min_bid` и `bid.strategy`: правила расчёта ставки.
+- `browser.headless`, `browser.slow_mo`, `browser.navigation_timeout_ms`: параметры запуска браузера Playwright.
 
 ## Старт
 ```bash
@@ -19,6 +20,12 @@ avtor24-bot run ./configs
 ```
 
 Команда запускает воркер для каждого найденного файла конфигурации. Для прерывания воспользуйтесь `Ctrl+C`.
+
+Перед первым запуском установите движок Chromium для Playwright:
+
+```bash
+playwright install chromium
+```
 
 ## Обновление конфигурации
 Конфигурация перечитывается при каждом цикле опроса, поэтому достаточно отредактировать JSON-файл и сохранить его.

@@ -53,6 +53,26 @@ class AuthModel(BaseModel):
     user_agent: str
 
 
+class BrowserModel(BaseModel):
+    headless: bool = True
+    slow_mo: int = 0
+    navigation_timeout_ms: int = 15000
+
+    @field_validator("navigation_timeout_ms")
+    @classmethod
+    def validate_timeout(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("navigation timeout must be positive")
+        return value
+
+    @field_validator("slow_mo")
+    @classmethod
+    def validate_slow_mo(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("slow_mo must be non-negative")
+        return value
+
+
 class AccountConfigModel(BaseModel):
     login: str
     base_url: str
@@ -63,6 +83,7 @@ class AccountConfigModel(BaseModel):
     messages: MessagesModel = Field(default_factory=MessagesModel)
     bid: BidModel = Field(default_factory=BidModel)
     auth: AuthModel
+    browser: BrowserModel = Field(default_factory=BrowserModel)
 
     @field_validator("poll_interval_seconds", "min_seconds_between_bids", "followup_delay_seconds")
     @classmethod
