@@ -1,0 +1,27 @@
+{
+  "login": "demo-account",
+  "base_url": "https://avtor24.ru",
+  "poll_interval_seconds": 2,
+  "min_seconds_between_bids": 3,
+  "followup_delay_seconds": 300,
+  "filters": {
+    "subject_ids": ["141"],
+    "type_ids": ["19"],
+    "min_budget": 0,
+    "max_budget": 200000
+  },
+  "messages": {
+    "initial": "Здравствуйте! Готов выполнить заказ {order_title}.",
+    "followup": "Напоминаю о своём предложении по заказу {order_title}."
+  },
+  "bid": {
+    "strategy": "recommended",
+    "min_bid": 500,
+    "max_bid": 15000,
+    "multiplier": 1.05
+  },
+  "auth": {
+    "cookie": "_ym_uid=...; PHPSESSID=...",
+    "user_agent": "Mozilla/5.0"
+  }
+}
